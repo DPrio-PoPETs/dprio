@@ -29,7 +29,7 @@ impl Commitment {
         let mut buf = Vec::with_capacity(std::mem::size_of::<u64>());
         buf.write_u64::<NetworkEndian>(self.p).unwrap();
         let hash = Sha256::digest(&buf);
-        ClosedCommitment::new(self.n, buf)
+        ClosedCommitment::new(self.n, hash.to_vec())
     }
 
     pub fn publish(&self) -> u64 {
@@ -69,7 +69,7 @@ impl OpenedCommitment {
     }
 
     // TODO: how to make this anything that can iterate over OpenedCommitments?
-    fn gather(opened_commitments: &[OpenedCommitment]) -> Result<u64, CommitmentError> {
+    pub fn gather(opened_commitments: &[OpenedCommitment]) -> Result<u64, CommitmentError> {
         let mut sum: u128 = 0;
         let mut n: Option<u64> = None;
         for opened_commitment in opened_commitments {
@@ -121,10 +121,10 @@ fn r(delta: f64, epsilon: f64) -> Result<f64, ParameterError> {
     let mut minimum = (minimum.trunc() as u64) + 1;
     let mut power_of_2: u64 = 1;
     while minimum > 0 {
-        minimum >> 1;
-        power_of_2 << 1;
+        minimum = minimum >> 1;
+        power_of_2 = power_of_2 << 1;
     }
-    Ok(power_of_2)
+    Ok(power_of_2 as f64)
 }
 
 pub fn laplace(delta: f64, epsilon: f64) -> Result<u64, ParameterError> {
