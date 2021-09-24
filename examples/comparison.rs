@@ -5,9 +5,14 @@ use prio::encrypt::*;
 use prio::field::*;
 use prio::server::*;
 
+fn laplace_fixed_params() -> u32 {
+    dprio::laplace(10000.0_f64, 1.0_f64).unwrap() as u32
+}
+
 struct ClientState {
     client: Client<Field32>,
     data: Vec<u32>,
+    noise: Vec<u32>,
 }
 
 impl ClientState {
@@ -15,6 +20,16 @@ impl ClientState {
         ClientState {
             client: Client::new(dimension, public_key1.clone(), public_key2.clone()).unwrap(),
             data: vec![0, 0, 1, 0, 0, 0, 0, 0],
+            noise: vec![
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+                laplace_fixed_params(),
+            ],
         }
     }
 
@@ -25,6 +40,15 @@ impl ClientState {
             .map(|x| Field32::from(*x))
             .collect::<Vec<Field32>>();
         self.client.encode_simple(&data).unwrap()
+    }
+
+    fn get_noise(&mut self) -> (Vec<u8>, Vec<u8>) {
+        let noise = self
+            .noise
+            .iter()
+            .map(|x| Field32::from(*x))
+            .collect::<Vec<Field32>>();
+        self.client.encode_simple(&noise).unwrap()
     }
 }
 
@@ -107,7 +131,7 @@ fn main() {
     let mut server1 = ServerState::new(dimension, true, priv_key1);
     let mut server2 = ServerState::new(dimension, false, priv_key2);
 
-    let n_clients = 100;
+    let n_clients = 10000;
     let mut clients = Vec::with_capacity(n_clients);
     for _ in 0..n_clients {
         clients.push(ClientState::new(
@@ -119,13 +143,21 @@ fn main() {
 
     let mut shares_for_server1 = Vec::with_capacity(n_clients);
     let mut shares_for_server2 = Vec::with_capacity(n_clients);
+    let mut noise_for_server1 = Vec::with_capacity(n_clients);
+    let mut noise_for_server2 = Vec::with_capacity(n_clients);
     for mut client in clients {
         let (share1, share2) = client.get_shares();
         shares_for_server1.push(share1);
         shares_for_server2.push(share2);
+        let (noise1, noise2) = client.get_noise();
+        noise_for_server1.push(noise1);
+        noise_for_server2.push(noise2);
     }
 
     let eval_at = Field32::from(12313);
+
+    shares_for_server1.push(noise_for_server1.pop().unwrap());
+    shares_for_server2.push(noise_for_server2.pop().unwrap());
 
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
     let server2_verifications = server2.generate_verifications(&shares_for_server2, eval_at);
