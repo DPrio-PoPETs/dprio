@@ -5,8 +5,10 @@ use prio::encrypt::*;
 use prio::field::*;
 use prio::server::*;
 
+use dprio::*;
+
 fn laplace_fixed_params() -> u32 {
-    dprio::laplace(10000.0_f64, 1.0_f64).unwrap() as u32
+    laplace(10000.0_f64, 1.0_f64).unwrap() as u32
 }
 
 struct ClientState {
@@ -154,11 +156,28 @@ fn main() {
         noise_for_server2.push(noise2);
     }
 
+    let commitment_from_server1 = Commitment::new(n_clients as u64);
+    let commitment_from_server2 = Commitment::new(n_clients as u64);
+    let closed_commitment_from_server1 = commitment_from_server1.commit();
+    let closed_commitment_from_server2 = commitment_from_server2.commit();
+    let published_commitment_from_server1 = commitment_from_server1.publish();
+    let published_commitment_from_server2 = commitment_from_server2.publish();
+    let opened_commitment_from_server1 = closed_commitment_from_server1
+        .validate(published_commitment_from_server1)
+        .unwrap();
+    let opened_commitment_from_server2 = closed_commitment_from_server2
+        .validate(published_commitment_from_server2)
+        .unwrap();
+    let noise_index = OpenedCommitment::gather(&[
+        opened_commitment_from_server1,
+        opened_commitment_from_server2,
+    ])
+    .unwrap();
+
+    shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
+    shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
+
     let eval_at = Field32::from(12313);
-
-    shares_for_server1.push(noise_for_server1.pop().unwrap());
-    shares_for_server2.push(noise_for_server2.pop().unwrap());
-
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
     let server2_verifications = server2.generate_verifications(&shares_for_server2, eval_at);
 
