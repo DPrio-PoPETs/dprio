@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1.4"
+clap = {version = "2.33", features = ["yaml"]}
 rand = "0.8"
 sha2 = "0.9"
 

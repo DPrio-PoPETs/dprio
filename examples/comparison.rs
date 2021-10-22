@@ -1,5 +1,8 @@
+#[macro_use]
+extern crate clap;
 extern crate prio;
 
+use clap::App;
 use prio::client::*;
 use prio::encrypt::*;
 use prio::field::*;
@@ -117,6 +120,15 @@ impl ServerState {
 }
 
 fn main() {
+    let yaml = load_yaml!("comparison-cli.yaml");
+    let matches = App::from_yaml(yaml).get_matches();
+    let flavor = matches.value_of("flavor").unwrap();
+    let do_dprio = flavor.eq("dprio");
+    if !do_dprio && !flavor.eq("prio") {
+        eprintln!("unknown flavor '{}' (expecting 'dprio' or 'prio')", flavor);
+        return;
+    }
+
     // This code was adapted from
     // https://github.com/abetterinternet/libprio-rs/blob/e58a06de3af0bdcb12e4273751c33b5ceee94d95/examples/sum.rs
     let priv_key1 = PrivateKey::from_base64(
@@ -159,26 +171,27 @@ fn main() {
     }
 
     let start_time = Instant::now();
-    let commitment_from_server1 = Commitment::new(n_clients as u64);
-    let commitment_from_server2 = Commitment::new(n_clients as u64);
-    let closed_commitment_from_server1 = commitment_from_server1.commit();
-    let closed_commitment_from_server2 = commitment_from_server2.commit();
-    let published_commitment_from_server1 = commitment_from_server1.publish();
-    let published_commitment_from_server2 = commitment_from_server2.publish();
-    let opened_commitment_from_server1 = closed_commitment_from_server1
-        .validate(published_commitment_from_server1)
+    if do_dprio {
+        let commitment_from_server1 = Commitment::new(n_clients as u64);
+        let commitment_from_server2 = Commitment::new(n_clients as u64);
+        let closed_commitment_from_server1 = commitment_from_server1.commit();
+        let closed_commitment_from_server2 = commitment_from_server2.commit();
+        let published_commitment_from_server1 = commitment_from_server1.publish();
+        let published_commitment_from_server2 = commitment_from_server2.publish();
+        let opened_commitment_from_server1 = closed_commitment_from_server1
+            .validate(published_commitment_from_server1)
+            .unwrap();
+        let opened_commitment_from_server2 = closed_commitment_from_server2
+            .validate(published_commitment_from_server2)
+            .unwrap();
+        let noise_index = OpenedCommitment::gather(&[
+            opened_commitment_from_server1,
+            opened_commitment_from_server2,
+        ])
         .unwrap();
-    let opened_commitment_from_server2 = closed_commitment_from_server2
-        .validate(published_commitment_from_server2)
-        .unwrap();
-    let noise_index = OpenedCommitment::gather(&[
-        opened_commitment_from_server1,
-        opened_commitment_from_server2,
-    ])
-    .unwrap();
-
-    shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
-    shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
+        shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
+        shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
+    }
 
     let eval_at = Field32::from(12313);
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);

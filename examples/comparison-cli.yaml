@@ -1,0 +1,11 @@
+name: comparison
+version: "0.1"
+author: Dana Keeler <dkeeler@mozilla.com>
+about: Compare simulated dprio and prio
+args:
+    - flavor:
+        short: f
+        long: flavor
+        help: Which of dprio or prio to simulate
+        takes_value: true
+        required: true
