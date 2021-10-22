@@ -7,6 +7,8 @@ use prio::server::*;
 
 use dprio::*;
 
+use std::time::Instant;
+
 fn laplace_fixed_params() -> u32 {
     laplace(10000.0_f64, 1.0_f64).unwrap() as u32
 }
@@ -156,6 +158,7 @@ fn main() {
         noise_for_server2.push(noise2);
     }
 
+    let start_time = Instant::now();
     let commitment_from_server1 = Commitment::new(n_clients as u64);
     let commitment_from_server2 = Commitment::new(n_clients as u64);
     let closed_commitment_from_server1 = commitment_from_server1.commit();
@@ -193,5 +196,11 @@ fn main() {
     );
 
     let total_shares = server1.merge_and_get_total_shares(server2.total_shares());
-    println!("Final Publication: {:?}", total_shares);
+    let elapsed = start_time.elapsed();
+
+    println!(
+        "Final Publication: {:?} (in {} ms)",
+        total_shares,
+        elapsed.as_millis()
+    );
 }
