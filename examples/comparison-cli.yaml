@@ -9,3 +9,15 @@ args:
         help: Which of dprio or prio to simulate
         takes_value: true
         required: true
+    - dimension:
+        short: d
+        long: dimension
+        help: How many bits of information to encode
+        takes_value: true
+        required: true
+    - clients:
+        short: c
+        long: clients
+        help: How many clients to simulate
+        takes_value: true
+        required: true

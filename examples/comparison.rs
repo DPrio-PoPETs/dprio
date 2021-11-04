@@ -12,10 +12,6 @@ use dprio::*;
 
 use std::time::Instant;
 
-fn laplace_fixed_params() -> u32 {
-    laplace(10000.0_f64, 1.0_f64).unwrap() as u32
-}
-
 struct ClientState {
     client: Client<Field32>,
     data: Vec<u32>,
@@ -23,20 +19,23 @@ struct ClientState {
 }
 
 impl ClientState {
-    fn new(dimension: usize, public_key1: &PublicKey, public_key2: &PublicKey) -> ClientState {
+    fn new(
+        dimension: usize,
+        n_clients: usize,
+        public_key1: &PublicKey,
+        public_key2: &PublicKey,
+    ) -> ClientState {
+        let mut data = vec![0; dimension];
+        data[0] = 1;
+        let mut noise = Vec::with_capacity(dimension);
+        for _ in 0..dimension {
+            noise.push(laplace(n_clients as f64, 1.0_f64).unwrap() as u32);
+        }
+
         ClientState {
             client: Client::new(dimension, public_key1.clone(), public_key2.clone()).unwrap(),
-            data: vec![0, 0, 1, 0, 0, 0, 0, 0],
-            noise: vec![
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-                laplace_fixed_params(),
-            ],
+            data,
+            noise,
         }
     }
 
@@ -128,6 +127,16 @@ fn main() {
         eprintln!("unknown flavor '{}' (expecting 'dprio' or 'prio')", flavor);
         return;
     }
+    let dimension = matches
+        .value_of("dimension")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+    let n_clients = matches
+        .value_of("clients")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
 
     // This code was adapted from
     // https://github.com/abetterinternet/libprio-rs/blob/e58a06de3af0bdcb12e4273751c33b5ceee94d95/examples/sum.rs
@@ -142,16 +151,14 @@ fn main() {
     )
     .unwrap();
 
-    let dimension = 8;
-
     let mut server1 = ServerState::new(dimension, true, priv_key1);
     let mut server2 = ServerState::new(dimension, false, priv_key2);
 
-    let n_clients = 10000;
     let mut clients = Vec::with_capacity(n_clients);
     for _ in 0..n_clients {
         clients.push(ClientState::new(
             dimension,
+            n_clients,
             server1.get_public_key(),
             server2.get_public_key(),
         ));
