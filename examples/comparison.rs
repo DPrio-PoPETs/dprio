@@ -215,12 +215,14 @@ fn main() {
         &server2_verifications,
     );
 
-    let total_shares = server1.merge_and_get_total_shares(server2.total_shares());
+    let _total_shares = server1.merge_and_get_total_shares(server2.total_shares());
     let elapsed = start_time.elapsed();
 
     println!(
-        "Final Publication: {:?} (in {} ms)",
-        total_shares,
+        "{},{},{},{}",
+        do_dprio,
+        dimension,
+        n_clients,
         elapsed.as_millis()
     );
 }
