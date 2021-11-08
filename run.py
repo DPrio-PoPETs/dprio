@@ -3,8 +3,7 @@
 import subprocess
 
 def run(args):
-    result = subprocess.run(args, capture_output=True, check=True)
-    print(str(result.stdout[:-1], encoding="utf-8"))
+    subprocess.run(args, check=True)
 
 dimensions = ["1", "8", "64", "256"]
 for dimension in dimensions:
