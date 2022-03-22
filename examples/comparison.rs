@@ -7,6 +7,7 @@ use prio::client::*;
 use prio::encrypt::*;
 use prio::field::*;
 use prio::server::*;
+use rand::Rng;
 
 use dprio::*;
 
@@ -15,22 +16,33 @@ use std::time::Instant;
 struct ClientState {
     client: Client<Field32>,
     data: Vec<u32>,
-    noise: Vec<u32>,
+    noise: Option<Vec<u32>>,
 }
 
 impl ClientState {
     fn new(
         dimension: usize,
         n_clients: usize,
+        generate_noise: bool,
         public_key1: &PublicKey,
         public_key2: &PublicKey,
     ) -> ClientState {
         let mut data = vec![0; dimension];
-        data[0] = 1;
-        let mut noise = Vec::with_capacity(dimension);
-        for _ in 0..dimension {
-            noise.push(laplace(n_clients as f64, 1.0_f64).unwrap() as u32);
+        // Uniformly at random set an index (or don't, with probability 1/(dimension + 1)).
+        let mut rng = rand::thread_rng();
+        let set_index = rng.gen_range(0..=dimension);
+        if set_index != dimension {
+            data[set_index] = 1;
         }
+        let noise = if generate_noise {
+            let mut noise = Vec::with_capacity(dimension);
+            for _ in 0..dimension {
+                noise.push(laplace(n_clients as f64, 1.0_f64).unwrap() as u32);
+            }
+            Some(noise)
+        } else {
+            None
+        };
 
         ClientState {
             client: Client::new(dimension, public_key1.clone(), public_key2.clone()).unwrap(),
@@ -48,13 +60,16 @@ impl ClientState {
         self.client.encode_simple(&data).unwrap()
     }
 
-    fn get_noise(&mut self) -> (Vec<u8>, Vec<u8>) {
-        let noise = self
-            .noise
-            .iter()
-            .map(|x| Field32::from(*x))
-            .collect::<Vec<Field32>>();
-        self.client.encode_simple(&noise).unwrap()
+    fn get_noise(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+        if let Some(noise) = self.noise.as_ref() {
+            let noise = noise
+                .iter()
+                .map(|x| Field32::from(*x))
+                .collect::<Vec<Field32>>();
+            Some(self.client.encode_simple(&noise).unwrap())
+        } else {
+            None
+        }
     }
 }
 
@@ -155,10 +170,12 @@ fn main() {
     let mut server2 = ServerState::new(dimension, false, priv_key2);
 
     let mut clients = Vec::with_capacity(n_clients);
+    let client_encode_data_start_time = Instant::now();
     for _ in 0..n_clients {
         clients.push(ClientState::new(
             dimension,
             n_clients,
+            do_dprio,
             server1.get_public_key(),
             server2.get_public_key(),
         ));
@@ -168,16 +185,22 @@ fn main() {
     let mut shares_for_server2 = Vec::with_capacity(n_clients);
     let mut noise_for_server1 = Vec::with_capacity(n_clients);
     let mut noise_for_server2 = Vec::with_capacity(n_clients);
-    for mut client in clients {
+    for client in &mut clients {
         let (share1, share2) = client.get_shares();
         shares_for_server1.push(share1);
         shares_for_server2.push(share2);
-        let (noise1, noise2) = client.get_noise();
-        noise_for_server1.push(noise1);
-        noise_for_server2.push(noise2);
     }
+    if do_dprio {
+        for mut client in clients {
+            let (noise1, noise2) = client.get_noise().unwrap();
+            noise_for_server1.push(noise1);
+            noise_for_server2.push(noise2);
+        }
+    }
+    let client_encode_data_elapsed = client_encode_data_start_time.elapsed();
 
     let start_time = Instant::now();
+    let choose_noise_start_time = Instant::now();
     if do_dprio {
         let commitment_from_server1 = Commitment::new(n_clients as u64);
         let commitment_from_server2 = Commitment::new(n_clients as u64);
@@ -199,11 +222,15 @@ fn main() {
         shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
         shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
     }
+    let choose_noise_elapsed = choose_noise_start_time.elapsed();
 
+    let verify_start_time = Instant::now();
     let eval_at = Field32::from(12313);
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
     let server2_verifications = server2.generate_verifications(&shares_for_server2, eval_at);
+    let verify_elapsed = verify_start_time.elapsed();
 
+    let aggregate_and_merge_start_time = Instant::now();
     server1.aggregate(
         shares_for_server1,
         &server1_verifications,
@@ -214,15 +241,20 @@ fn main() {
         &server1_verifications,
         &server2_verifications,
     );
+    let aggregate_and_merge_elapsed = aggregate_and_merge_start_time.elapsed();
 
     let _total_shares = server1.merge_and_get_total_shares(server2.total_shares());
     let elapsed = start_time.elapsed();
 
     println!(
-        "{},{},{},{}",
+        "{},{},{},{} ms,{} us,{} ms,{} ms,{} ms",
         do_dprio,
         dimension,
         n_clients,
+        client_encode_data_elapsed.as_millis(),
+        choose_noise_elapsed.as_micros(),
+        verify_elapsed.as_millis(),
+        aggregate_and_merge_elapsed.as_millis(),
         elapsed.as_millis()
     );
 }
