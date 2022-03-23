@@ -2,7 +2,7 @@
 extern crate clap;
 extern crate prio;
 
-use clap::App;
+use clap::Command;
 use prio::client::*;
 use prio::encrypt::*;
 use prio::field::*;
@@ -134,8 +134,14 @@ impl ServerState {
 }
 
 fn main() {
-    let yaml = load_yaml!("comparison-cli.yaml");
-    let matches = App::from_yaml(yaml).get_matches();
+    let matches = Command::new("comparison")
+        .version("0.1")
+        .author("Dana Keeler <dkeeler@mozilla.com>")
+        .about("Compare simulated prio and dprio")
+        .arg(arg!(-f --flavor <VALUE> "Which of prio or dprio to simulate"))
+        .arg(arg!(-d --dimension  <VALUE> "How many bits of information to encode"))
+        .arg(arg!(-c --clients <VALUE> "How many clients to simulate"))
+        .get_matches();
     let flavor = matches.value_of("flavor").unwrap();
     let do_dprio = flavor.eq("dprio");
     if !do_dprio && !flavor.eq("prio") {
