@@ -1,4 +1,5 @@
 extern crate byteorder;
+extern crate rand;
 extern crate sha2;
 
 use byteorder::{NetworkEndian, WriteBytesExt};

@@ -6,13 +6,12 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1.4"
-clap = {version = "2.33", features = ["yaml"]}
 rand = "0.8"
-sha2 = "0.9"
+sha2 = "0.10"
 
 [dev-dependencies]
-# TODO: when https://github.com/abetterinternet/libprio-rs/pull/66 gets released in a version on crates.io, this can point to that instead.
-prio = { git = "https://github.com/abetterinternet/libprio-rs" }
+clap = {version = "2.33", features = ["yaml"]}
+prio = "0.7"
 
 [[example]]
 name = "comparison"
