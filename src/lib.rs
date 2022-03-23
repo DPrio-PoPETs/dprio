@@ -73,7 +73,7 @@ impl OpenedCommitment {
         let mut sum: u128 = 0;
         let mut n: Option<u64> = None;
         for opened_commitment in opened_commitments {
-            if !n.is_some() {
+            if n.is_none() {
                 n.replace(opened_commitment.n);
             }
             if *n.as_ref().unwrap() != opened_commitment.n {
@@ -123,8 +123,8 @@ fn r(delta: f64, epsilon: f64) -> Result<f64, ParameterError> {
     let mut minimum = (minimum.trunc() as u64) + 1;
     let mut power_of_2: u64 = 1;
     while minimum > 0 {
-        minimum = minimum >> 1;
-        power_of_2 = power_of_2 << 1;
+        minimum >>= 1;
+        power_of_2 <<= 1;
     }
     Ok(power_of_2 as f64)
 }

@@ -93,14 +93,14 @@ impl ServerState {
 
     fn generate_verifications(
         &mut self,
-        shares: &Vec<Vec<u8>>,
+        shares: &[Vec<u8>],
         eval_at: Field32,
     ) -> Vec<VerificationMessage<Field32>> {
         shares
             .iter()
             .map(|share| {
                 self.server
-                    .generate_verification_message(eval_at, &share)
+                    .generate_verification_message(eval_at, share)
                     .unwrap()
             })
             .collect()
@@ -109,8 +109,8 @@ impl ServerState {
     fn aggregate(
         &mut self,
         shares: Vec<Vec<u8>>,
-        server1_verifications: &Vec<VerificationMessage<Field32>>,
-        server2_verifications: &Vec<VerificationMessage<Field32>>,
+        server1_verifications: &[VerificationMessage<Field32>],
+        server2_verifications: &[VerificationMessage<Field32>],
     ) {
         for ((share, server1_verification), server2_verification) in shares
             .iter()
