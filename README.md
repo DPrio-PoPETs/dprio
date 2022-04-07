@@ -13,4 +13,5 @@ $ cargo build
 $ cargo build --example comparison 
 
 run example
-$  cargo run --release --example comparison -- --flavor dprio --dimension 8 --clients 10000
+
+$ cargo run --release --example comparison -- --flavor dprio --dimension 8 --clients 10000
