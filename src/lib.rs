@@ -6,6 +6,8 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use rand::distributions::{Distribution, Uniform};
 use sha2::{Digest, Sha256};
 
+pub mod laplace;
+
 pub struct Commitment {
     n: u64,
     p: u64,
