@@ -6,11 +6,13 @@ use rand::Rng;
 
 use crate::ParameterError;
 
+use std::cmp;
+
 // For the following on approximating a laplace distribution, see
 // https://raw.githubusercontent.com/google/differential-privacy/main/common_docs/Secure_Noise_Generation.pdf
 
 // Ported and adapted from
-// https://github.com/google/differential-privacy/blob/74d5be96d4abe6820ef4838c00a1b78c72ae01af/java/main/com/google/privacy/differentialprivacy/SamplingUtil.java#L36
+// https://github.com/google/differential-privacy/blob/74d5be96d4abe6820ef4838c00a1b78c72ae01af/java/main/com/google/privacy/differentialprivacy/SamplingUtil.java
 // Original copyright notice:
 //
 // Copyright 2022 Google LLC
@@ -47,10 +49,14 @@ fn sample_geometric(rng: &mut ThreadRng, lambda: f64) -> Result<i64, ParameterEr
     let mut left: i64 = 0;
     let mut right: i64 = i64::MAX;
     while left + 1 < right {
-        // TODO: some stuff...
-        // let q: f64 = ...
-        let q = 0.0_f64;
-        let mid = 0_i64;
+        // TODO: log1p?
+        let mid: i64 = (left as f64
+            - (((0.5_f64).ln() + ((lambda * ((left - right) as f64)).exp() + 1.0_f64).ln())
+                / lambda))
+            .ceil() as i64;
+        let mid = cmp::min(cmp::max(mid, left + 1), right - 1);
+        let q = (lambda * ((left - mid) as f64) + 1.0_f64).ln()
+            / (lambda * ((left - right) as f64) + 1.0_f64).ln();
         if next_double(rng) <= q {
             right = mid;
         } else {
