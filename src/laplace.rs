@@ -1,3 +1,4 @@
+extern crate libm;
 extern crate rand;
 
 use rand::distributions::Standard;
@@ -37,26 +38,26 @@ fn next_double(rng: &mut ThreadRng) -> f64 {
 // Draws a sample from the geometric distribution parameterized by p = 1 - e^(-lambda).
 // Lambda must be greater than 2^(-59).
 fn sample_geometric(rng: &mut ThreadRng, lambda: f64) -> Result<i64, ParameterError> {
-    if lambda <= (-59.0_f64).exp2() {
+    if lambda <= libm::exp2(-59.0_f64) {
         return Err(ParameterError);
     }
 
     // If the sample exceeds the maximum i64 value, the sample is truncated.
-    if next_double(rng) > -1.0 * ((-1.0_f64 * lambda * (i64::MAX as f64)).exp() - 1.0_f64) {
+    if next_double(rng) > -1.0 * libm::expm1(-1.0_f64 * lambda * (i64::MAX as f64)) {
         return Ok(i64::MAX);
     }
 
     let mut left: i64 = 0;
     let mut right: i64 = i64::MAX;
     while left + 1 < right {
-        // TODO: log1p?
-        let mid: i64 = (left as f64
-            - (((0.5_f64).ln() + ((lambda * ((left - right) as f64)).exp() + 1.0_f64).ln())
-                / lambda))
-            .ceil() as i64;
+        let mid: i64 = libm::ceil(
+            left as f64
+                - (libm::log(0.5_f64) + libm::log1p(libm::exp(lambda * ((left - right) as f64))))
+                    / lambda,
+        ) as i64;
         let mid = cmp::min(cmp::max(mid, left + 1), right - 1);
-        let q = (lambda * ((left - mid) as f64) + 1.0_f64).ln()
-            / (lambda * ((left - right) as f64) + 1.0_f64).ln();
+        let q = libm::expm1(lambda * ((left - mid) as f64))
+            / libm::expm1(lambda * ((left - right) as f64));
         if next_double(rng) <= q {
             right = mid;
         } else {
