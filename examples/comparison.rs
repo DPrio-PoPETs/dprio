@@ -118,18 +118,18 @@ impl ServerState {
             .zip(server2_verifications.iter())
         {
             self.server
-                .aggregate(share, server1_verification, server2_verification)
+                .aggregate_by_sum(share, server1_verification, server2_verification)
                 .unwrap();
         }
     }
 
-    fn total_shares(&self) -> &[Field32] {
-        self.server.total_shares()
+    fn total_sum(&self) -> &Field32 {
+        self.server.total_sum()
     }
 
-    fn merge_and_get_total_shares(&mut self, other_server_shares: &[Field32]) -> &[Field32] {
-        self.server.merge_total_shares(other_server_shares).unwrap();
-        self.total_shares()
+    fn add_and_get_total_sum(&mut self, other_server_sum: &Field32) -> &Field32 {
+        self.server.add_total_shares(other_server_sum);
+        self.total_sum()
     }
 }
 
@@ -249,7 +249,8 @@ fn main() {
     );
     let aggregate_and_merge_elapsed = aggregate_and_merge_start_time.elapsed();
 
-    let _total_shares = server1.merge_and_get_total_shares(server2.total_shares());
+    let total_sum = server1.add_and_get_total_sum(server2.total_sum());
+    println!("total_sum: {:?}", total_sum);
     let elapsed = start_time.elapsed();
 
     println!(
