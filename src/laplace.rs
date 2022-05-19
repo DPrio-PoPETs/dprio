@@ -10,10 +10,10 @@ use crate::ParameterError;
 use std::cmp;
 
 // For the following on approximating a laplace distribution, see
-// https://raw.githubusercontent.com/google/differential-privacy/main/common_docs/Secure_Noise_Generation.pdf
+// https://raw.githubusercontent.com/google/differential-privacy/74d5be96d4abe6820ef4838c00a1b78c72ae01af/common_docs/Secure_Noise_Generation.pdf
 
 // Ported and adapted from
-// https://github.com/google/differential-privacy/blob/main/java/main/com/google/privacy/differentialprivacy/LaplaceNoise.java
+// https://github.com/google/differential-privacy/blob/74d5be96d4abe6820ef4838c00a1b78c72ae01af/java/main/com/google/privacy/differentialprivacy/LaplaceNoise.java
 // https://github.com/google/differential-privacy/blob/74d5be96d4abe6820ef4838c00a1b78c72ae01af/java/main/com/google/privacy/differentialprivacy/SamplingUtil.java
 // Original copyright notice:
 //
