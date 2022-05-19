@@ -83,7 +83,7 @@ fn sample_two_sided_geometric(rng: &mut ThreadRng, lambda: f64) -> Result<i64, P
     }
 }
 
-pub fn noise(l1_sensitivity: f64, epsilon: f64) -> Result<f64, ParameterError> {
+pub fn noise(l1_sensitivity: f64, epsilon: f64) -> Result<i64, ParameterError> {
     // TODO: check parameters
     let granularity = get_granularity(l1_sensitivity, epsilon)?;
     let mut rng = rand::thread_rng();
@@ -91,8 +91,11 @@ pub fn noise(l1_sensitivity: f64, epsilon: f64) -> Result<f64, ParameterError> {
         &mut rng,
         granularity * epsilon / (l1_sensitivity + granularity),
     )?;
-    // TODO: round to multiple of power of 2?
-    Ok(two_sided_geometric_sample as f64 * granularity)
+    if granularity <= 1.0_f64 {
+        Ok((two_sided_geometric_sample as f64 * granularity).round() as i64)
+    } else {
+        Ok(two_sided_geometric_sample * granularity.trunc() as i64)
+    }
 }
 
 // The granularity parameter is 2^40.
