@@ -7,6 +7,7 @@ use prio::client::*;
 use prio::encrypt::*;
 use prio::field::*;
 use prio::server::*;
+use rand::distributions::Binomial;
 use rand::Rng;
 
 use dprio::*;
@@ -22,22 +23,28 @@ struct ClientState {
 impl ClientState {
     fn new(
         dimension: usize,
-        n_clients: usize,
         generate_noise: bool,
         public_key1: &PublicKey,
         public_key2: &PublicKey,
     ) -> ClientState {
+        assert!(dimension > 0);
         let mut data = vec![0; dimension];
-        // Uniformly at random set an index (or don't, with probability 1/(dimension + 1)).
+        // The study is a count, so each client will either set or not set the
+        // 0th bit of the data. For this simulation, each client sets the bit
+        // with probability 1/2.
         let mut rng = rand::thread_rng();
-        let set_index = rng.gen_range(0..=dimension);
-        if set_index != dimension {
-            data[set_index] = 1;
-        }
+        data[0] = rng.sample(Binomial::new(1, 0.5)) as u32;
         let noise = if generate_noise {
             let mut noise = Vec::with_capacity(dimension);
-            for _ in 0..dimension {
-                noise.push(laplace(n_clients as f64, 1.0_f64).unwrap() as u32);
+            let mut noise_value =
+                laplace::noise(1.0_f64, 0.1_f64).expect("parameters should be fine"); // TODO: epsilon
+            if noise_value < 0 {
+                noise_value = -noise_value; // TODO: not this
+            }
+            for i in 0..dimension {
+                let ith_bit = (noise_value >> i) & 1;
+                assert!(ith_bit == 0 || ith_bit == 1);
+                noise.push(ith_bit as u32);
             }
             Some(noise)
         } else {
@@ -180,7 +187,6 @@ fn main() {
     for _ in 0..n_clients {
         clients.push(ClientState::new(
             dimension,
-            n_clients,
             do_dprio,
             server1.get_public_key(),
             server2.get_public_key(),
