@@ -147,21 +147,22 @@ impl ServerState {
     }
 }
 
+#[derive(Debug)]
+struct Results {
+    dimension: usize,
+    calculated_sum: Field32,
+    client_elapsed: u128,
+    server_elapsed: u128,
+}
+
 fn main() {
     let matches = Command::new("comparison")
         .version("0.1")
         .author("Dana Keeler <dkeeler@mozilla.com>")
         .about("Compare simulated prio and dprio")
-        .arg(arg!(-f --flavor <VALUE> "Which of prio or dprio to simulate"))
-        .arg(arg!(-e --epsilon <VALUE> "value of epsilon"))
-        .arg(arg!(-c --clients <VALUE> "How many clients to simulate"))
+        .arg(arg!(-e --epsilon <VALUE> "value of epsilon for dprio"))
+        .arg(arg!(-c --clients <VALUE> "number of clients to simulate"))
         .get_matches();
-    let flavor = matches.value_of("flavor").unwrap();
-    let do_dprio = flavor.eq("dprio");
-    if !do_dprio && !flavor.eq("prio") {
-        eprintln!("unknown flavor '{}' (expecting 'dprio' or 'prio')", flavor);
-        return;
-    }
     let epsilon = matches.value_of("epsilon").unwrap().parse::<f64>().unwrap();
     let n_clients = matches
         .value_of("clients")
@@ -181,13 +182,22 @@ fn main() {
          LMQIQoRwDVaW64g/WTdcxT4rDULoycUNFB60LER6hPEHg/ObBnRPV1rwS3nj9Bj0tbjVPPyL9p8QW8B+w==",
     )
     .unwrap();
-    do_simulation(
-        do_dprio,
+    let prio_results = do_simulation(
+        false,
         epsilon,
         n_clients,
         priv_key1.clone(),
         priv_key2.clone(),
     );
+    let dprio_results = do_simulation(
+        true,
+        epsilon,
+        n_clients,
+        priv_key1.clone(),
+        priv_key2.clone(),
+    );
+    println!("{:?}", prio_results);
+    println!("{:?}", dprio_results);
 }
 
 fn do_simulation(
@@ -196,7 +206,7 @@ fn do_simulation(
     n_clients: usize,
     priv_key1: PrivateKey,
     priv_key2: PrivateKey,
-) {
+) -> Results {
     // +1 to minimum bits to be able to handle negative noise values
     let dimension = if do_dprio {
         laplace::min_bits(1.0_f64, epsilon).expect("min_bits should succeed") + 1
@@ -214,7 +224,7 @@ fn do_simulation(
     };
     assert!(shift_value >= 0);
     let mut clients = Vec::with_capacity(n_clients);
-    let client_encode_data_start_time = Instant::now();
+    let client_start_time = Instant::now();
     for _ in 0..n_clients {
         clients.push(ClientState::new(
             dimension,
@@ -242,10 +252,9 @@ fn do_simulation(
             noise_for_server2.push(noise2);
         }
     }
-    let client_encode_data_elapsed = client_encode_data_start_time.elapsed();
+    let client_elapsed = client_start_time.elapsed();
 
-    let start_time = Instant::now();
-    let choose_noise_start_time = Instant::now();
+    let server_start_time = Instant::now();
     if do_dprio {
         let commitment_from_server1 = Commitment::new(n_clients as u64);
         let commitment_from_server2 = Commitment::new(n_clients as u64);
@@ -267,15 +276,11 @@ fn do_simulation(
         shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
         shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
     }
-    let choose_noise_elapsed = choose_noise_start_time.elapsed();
 
-    let verify_start_time = Instant::now();
     let eval_at = Field32::from(12313);
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
     let server2_verifications = server2.generate_verifications(&shares_for_server2, eval_at);
-    let verify_elapsed = verify_start_time.elapsed();
 
-    let aggregate_and_merge_start_time = Instant::now();
     server1.aggregate(
         shares_for_server1,
         &server1_verifications,
@@ -286,27 +291,18 @@ fn do_simulation(
         &server1_verifications,
         &server2_verifications,
     );
-    let aggregate_and_merge_elapsed = aggregate_and_merge_start_time.elapsed();
 
     let raw_sum = *server1.add_and_get_total_sum(server2.total_sum());
     let total_shift_count = if do_dprio { n_clients + 1 } else { n_clients };
     let total_shift_value = Field32::from((shift_value as usize * total_shift_count) as u32);
-    eprintln!("total_shift_value: {:?}", total_shift_value);
-    eprintln!("raw_sum: {:?}", raw_sum);
     // assert!(total_shift_value <= raw_sum); TODO: why doesn't this work
     let total_sum = raw_sum - total_shift_value;
-    println!("total_sum: {:?}", total_sum);
-    let elapsed = start_time.elapsed();
+    let server_elapsed = server_start_time.elapsed();
 
-    println!(
-        "{},{},{},{} ms,{} us,{} ms,{} ms,{} ms",
-        do_dprio,
+    Results {
         dimension,
-        n_clients,
-        client_encode_data_elapsed.as_millis(),
-        choose_noise_elapsed.as_micros(),
-        verify_elapsed.as_millis(),
-        aggregate_and_merge_elapsed.as_millis(),
-        elapsed.as_millis()
-    );
+        calculated_sum: total_sum,
+        client_elapsed: client_elapsed.as_millis(),
+        server_elapsed: server_elapsed.as_millis(),
+    }
 }
