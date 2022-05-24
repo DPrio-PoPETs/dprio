@@ -23,29 +23,36 @@ struct ClientState {
 impl ClientState {
     fn new(
         dimension: usize,
+        shift_value: isize,
+        epsilon: f64,
         generate_noise: bool,
         public_key1: &PublicKey,
         public_key2: &PublicKey,
     ) -> ClientState {
         assert!(dimension > 0);
-        let mut data = vec![0; dimension];
-        // The study is a count, so each client will either set or not set the
-        // 0th bit of the data. For this simulation, each client sets the bit
-        // with probability 1/2.
+        assert!(shift_value >= 0);
+        let mut data = Vec::with_capacity(dimension);
+        // The study is a count, so each client will send either 0 or 1. For this simulation, the
+        // probability of sending 1 is 0.5. Since we have to account for negative noise, we also add
+        // 2^(dimension - 1) (shift_value) to the value being sent.
         let mut rng = rand::thread_rng();
-        data[0] = rng.sample(Binomial::new(1, 0.5)) as u32;
+        let value = shift_value as usize + rng.sample(Binomial::new(1, 0.5)) as usize;
+        for i in 0..dimension {
+            let ith_bit = (value >> i) & 1;
+            data.push(ith_bit as u32);
+        }
+        assert!(data.len() == dimension);
         let noise = if generate_noise {
             let mut noise = Vec::with_capacity(dimension);
-            let mut noise_value =
-                laplace::noise(1.0_f64, 0.1_f64).expect("parameters should be fine"); // TODO: epsilon
-            if noise_value < 0 {
-                noise_value = -noise_value; // TODO: not this
-            }
+            let noise_value = laplace::noise(1.0_f64, epsilon).expect("parameters should be fine")
+                as isize
+                + shift_value;
+            assert!(noise_value >= 0);
             for i in 0..dimension {
                 let ith_bit = (noise_value >> i) & 1;
-                assert!(ith_bit == 0 || ith_bit == 1);
                 noise.push(ith_bit as u32);
             }
+            assert!(noise.len() == dimension);
             Some(noise)
         } else {
             None
@@ -174,16 +181,45 @@ fn main() {
          LMQIQoRwDVaW64g/WTdcxT4rDULoycUNFB60LER6hPEHg/ObBnRPV1rwS3nj9Bj0tbjVPPyL9p8QW8B+w==",
     )
     .unwrap();
+    do_simulation(
+        do_dprio,
+        epsilon,
+        n_clients,
+        priv_key1.clone(),
+        priv_key2.clone(),
+    );
+}
 
-    let dimension = laplace::min_bits(1.0_f64, epsilon).expect("min_bits should succeed");
+fn do_simulation(
+    do_dprio: bool,
+    epsilon: f64,
+    n_clients: usize,
+    priv_key1: PrivateKey,
+    priv_key2: PrivateKey,
+) {
+    // +1 to minimum bits to be able to handle negative noise values
+    let dimension = if do_dprio {
+        laplace::min_bits(1.0_f64, epsilon).expect("min_bits should succeed") + 1
+    } else {
+        1
+    };
     let mut server1 = ServerState::new(dimension, true, priv_key1);
     let mut server2 = ServerState::new(dimension, false, priv_key2);
 
+    let shift_value = if do_dprio {
+        assert!(dimension > 1 && dimension <= u32::MAX as usize);
+        2isize.pow((dimension - 1) as u32)
+    } else {
+        0
+    };
+    assert!(shift_value >= 0);
     let mut clients = Vec::with_capacity(n_clients);
     let client_encode_data_start_time = Instant::now();
     for _ in 0..n_clients {
         clients.push(ClientState::new(
             dimension,
+            shift_value,
+            epsilon,
             do_dprio,
             server1.get_public_key(),
             server2.get_public_key(),
@@ -252,7 +288,13 @@ fn main() {
     );
     let aggregate_and_merge_elapsed = aggregate_and_merge_start_time.elapsed();
 
-    let total_sum = server1.add_and_get_total_sum(server2.total_sum());
+    let raw_sum = *server1.add_and_get_total_sum(server2.total_sum());
+    let total_shift_count = if do_dprio { n_clients + 1 } else { n_clients };
+    let total_shift_value = Field32::from((shift_value as usize * total_shift_count) as u32);
+    eprintln!("total_shift_value: {:?}", total_shift_value);
+    eprintln!("raw_sum: {:?}", raw_sum);
+    // assert!(total_shift_value <= raw_sum); TODO: why doesn't this work
+    let total_sum = raw_sum - total_shift_value;
     println!("total_sum: {:?}", total_sum);
     let elapsed = start_time.elapsed();
 
