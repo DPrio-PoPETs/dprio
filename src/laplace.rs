@@ -122,3 +122,13 @@ fn ceil_power_of_two(x: f64) -> Result<f64, ParameterError> {
 fn get_granularity(l1_sensitivity: f64, epsilon: f64) -> Result<f64, ParameterError> {
     Ok(ceil_power_of_two(l1_sensitivity / epsilon)? / GRANULARITY_PARAM)
 }
+
+// Given our analysis, the minimum number of bits required is ceil(log_2(r/lambda * 6 ln 10)), where
+// r is the granularity (see `get_granularity`, and lambda is r * epsilon / (1l_sensitivity + r).
+pub fn min_bits(l1_sensitivity: f64, epsilon: f64) -> Result<usize, ParameterError> {
+    let granularity = get_granularity(l1_sensitivity, epsilon)?;
+    let lambda = granularity * epsilon / (l1_sensitivity + granularity);
+    Ok((6.0_f64 * 10.0_f64.ln() * granularity / lambda)
+        .log2()
+        .ceil() as usize)
+}

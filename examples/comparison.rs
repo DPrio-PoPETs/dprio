@@ -146,7 +146,7 @@ fn main() {
         .author("Dana Keeler <dkeeler@mozilla.com>")
         .about("Compare simulated prio and dprio")
         .arg(arg!(-f --flavor <VALUE> "Which of prio or dprio to simulate"))
-        .arg(arg!(-d --dimension  <VALUE> "How many bits of information to encode"))
+        .arg(arg!(-e --epsilon <VALUE> "value of epsilon"))
         .arg(arg!(-c --clients <VALUE> "How many clients to simulate"))
         .get_matches();
     let flavor = matches.value_of("flavor").unwrap();
@@ -155,11 +155,7 @@ fn main() {
         eprintln!("unknown flavor '{}' (expecting 'dprio' or 'prio')", flavor);
         return;
     }
-    let dimension = matches
-        .value_of("dimension")
-        .unwrap()
-        .parse::<usize>()
-        .unwrap();
+    let epsilon = matches.value_of("epsilon").unwrap().parse::<f64>().unwrap();
     let n_clients = matches
         .value_of("clients")
         .unwrap()
@@ -179,6 +175,7 @@ fn main() {
     )
     .unwrap();
 
+    let dimension = laplace::min_bits(1.0_f64, epsilon).expect("min_bits should succeed");
     let mut server1 = ServerState::new(dimension, true, priv_key1);
     let mut server2 = ServerState::new(dimension, false, priv_key2);
 
