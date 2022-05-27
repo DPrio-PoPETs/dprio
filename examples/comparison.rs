@@ -18,6 +18,7 @@ struct ClientState {
     client: Client<Field32>,
     data: Vec<u32>,
     noise: Option<Vec<u32>>,
+    actual_value: usize,
 }
 
 impl ClientState {
@@ -36,7 +37,8 @@ impl ClientState {
         // probability of sending 1 is 0.5. Since we have to account for negative noise, we also add
         // 2^(dimension - 1) (shift_value) to the value being sent.
         let mut rng = rand::thread_rng();
-        let value = shift_value as usize + rng.sample(Binomial::new(1, 0.5)) as usize;
+        let actual_value = rng.sample(Binomial::new(1, 0.5)) as usize;
+        let value = shift_value as usize + actual_value;
         for i in 0..dimension {
             let ith_bit = (value >> i) & 1;
             data.push(ith_bit as u32);
@@ -62,6 +64,7 @@ impl ClientState {
             client: Client::new(dimension, public_key1.clone(), public_key2.clone()).unwrap(),
             data,
             noise,
+            actual_value,
         }
     }
 
@@ -150,7 +153,8 @@ impl ServerState {
 #[derive(Debug)]
 struct Results {
     dimension: usize,
-    calculated_sum: Field32,
+    calculated_sum: usize,
+    actual_sum: usize,
     client_elapsed: u128,
     server_elapsed: u128,
 }
@@ -224,16 +228,19 @@ fn do_simulation(
     };
     assert!(shift_value >= 0);
     let mut clients = Vec::with_capacity(n_clients);
+    let mut actual_value = 0;
     let client_start_time = Instant::now();
     for _ in 0..n_clients {
-        clients.push(ClientState::new(
+        let client = ClientState::new(
             dimension,
             shift_value,
             epsilon,
             do_dprio,
             server1.get_public_key(),
             server2.get_public_key(),
-        ));
+        );
+        actual_value += client.actual_value;
+        clients.push(client);
     }
 
     let mut shares_for_server1 = Vec::with_capacity(n_clients);
@@ -301,7 +308,8 @@ fn do_simulation(
 
     Results {
         dimension,
-        calculated_sum: total_sum,
+        calculated_sum: <u32 as From<Field32>>::from(total_sum) as usize,
+        actual_sum: actual_value,
         client_elapsed: client_elapsed.as_millis(),
         server_elapsed: server_elapsed.as_millis(),
     }
