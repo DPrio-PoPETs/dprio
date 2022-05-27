@@ -159,6 +159,19 @@ struct Results {
     server_elapsed: u128,
 }
 
+fn average_elapsed(results: &[Results]) -> (f64, f64) {
+    let mut client_elapsed_sum = 0;
+    let mut server_elapsed_sum = 0;
+    for result in results.iter() {
+        client_elapsed_sum += result.client_elapsed;
+        server_elapsed_sum += result.server_elapsed;
+    }
+    (
+        client_elapsed_sum as f64 / results.len() as f64,
+        server_elapsed_sum as f64 / results.len() as f64,
+    )
+}
+
 fn main() {
     let matches = Command::new("comparison")
         .version("0.1")
@@ -166,10 +179,16 @@ fn main() {
         .about("Compare simulated prio and dprio")
         .arg(arg!(-e --epsilon <VALUE> "value of epsilon for dprio"))
         .arg(arg!(-c --clients <VALUE> "number of clients to simulate"))
+        .arg(arg!(-t --trials <VALUE> "number of trials to run"))
         .get_matches();
     let epsilon = matches.value_of("epsilon").unwrap().parse::<f64>().unwrap();
     let n_clients = matches
         .value_of("clients")
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+    let n_trials = matches
+        .value_of("trials")
         .unwrap()
         .parse::<usize>()
         .unwrap();
@@ -186,22 +205,36 @@ fn main() {
          LMQIQoRwDVaW64g/WTdcxT4rDULoycUNFB60LER6hPEHg/ObBnRPV1rwS3nj9Bj0tbjVPPyL9p8QW8B+w==",
     )
     .unwrap();
-    let prio_results = do_simulation(
-        false,
-        epsilon,
-        n_clients,
-        priv_key1.clone(),
-        priv_key2.clone(),
+    let mut prio_results = Vec::with_capacity(n_trials);
+    let mut dprio_results = Vec::with_capacity(n_trials);
+    for _ in 0..n_trials {
+        prio_results.push(do_simulation(
+            false,
+            epsilon,
+            n_clients,
+            priv_key1.clone(),
+            priv_key2.clone(),
+        ));
+        dprio_results.push(do_simulation(
+            true,
+            epsilon,
+            n_clients,
+            priv_key1.clone(),
+            priv_key2.clone(),
+        ));
+    }
+    let (prio_client_elapsed, prio_server_elapsed) = average_elapsed(&prio_results);
+    println!("prio: {} {}", prio_client_elapsed, prio_server_elapsed);
+    let (dprio_client_elapsed, dprio_server_elapsed) = average_elapsed(&dprio_results);
+    println!("dprio: {} {}", dprio_client_elapsed, dprio_server_elapsed);
+    let client_overhead =
+        100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
+    let server_overhead =
+        100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
+    println!(
+        "client overhead: {:.2}% server overhead: {:.2}%",
+        client_overhead, server_overhead
     );
-    let dprio_results = do_simulation(
-        true,
-        epsilon,
-        n_clients,
-        priv_key1.clone(),
-        priv_key2.clone(),
-    );
-    println!("{:?}", prio_results);
-    println!("{:?}", dprio_results);
 }
 
 fn do_simulation(
