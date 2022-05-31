@@ -12,6 +12,7 @@ use rand::Rng;
 
 use dprio::*;
 
+use std::fmt;
 use std::time::Instant;
 
 struct ClientState {
@@ -152,11 +153,28 @@ impl ServerState {
 
 #[derive(Debug)]
 struct Results {
+    dprio: bool,
     dimension: usize,
     calculated_sum: usize,
     actual_sum: usize,
     client_elapsed: u128,
     server_elapsed: u128,
+}
+
+impl fmt::Display for Results {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let flavor = if self.dprio { "dprio" } else { "prio" };
+        write!(
+            f,
+            "{},{},{},{},{},{},",
+            flavor,
+            self.dimension,
+            self.calculated_sum,
+            self.actual_sum,
+            self.client_elapsed,
+            self.server_elapsed
+        )
+    }
 }
 
 fn average_elapsed(results: &[Results]) -> (f64, f64) {
@@ -172,29 +190,47 @@ fn average_elapsed(results: &[Results]) -> (f64, f64) {
     )
 }
 
+struct Params {
+    epsilon: f64,
+    clients: usize,
+    trials: usize,
+}
+
+impl Params {
+    fn new(epsilon: f64, clients: usize, trials: usize) -> Params {
+        Params {
+            epsilon,
+            clients,
+            trials,
+        }
+    }
+}
+
+impl fmt::Display for Params {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{},{},{},", self.epsilon, self.clients, self.trials)
+    }
+}
+
 fn main() {
-    let matches = Command::new("comparison")
+    let _matches = Command::new("comparison")
         .version("0.1")
         .author("Dana Keeler <dkeeler@mozilla.com>")
         .about("Compare simulated prio and dprio")
-        .arg(arg!(-e --epsilon <VALUE> "value of epsilon for dprio"))
-        .arg(arg!(-c --clients <VALUE> "number of clients to simulate"))
-        .arg(arg!(-t --trials <VALUE> "number of trials to run"))
         .get_matches();
-    let epsilon = matches.value_of("epsilon").unwrap().parse::<f64>().unwrap();
-    let n_clients = matches
-        .value_of("clients")
-        .unwrap()
-        .parse::<usize>()
-        .unwrap();
-    let n_trials = matches
-        .value_of("trials")
-        .unwrap()
-        .parse::<usize>()
-        .unwrap();
 
-    // This code was adapted from
-    // https://github.com/abetterinternet/libprio-rs/blob/e58a06de3af0bdcb12e4273751c33b5ceee94d95/examples/sum.rs
+    let epsilon_params = [
+        Params::new(0.1_f64, 10000, 5),
+        Params::new(0.2_f64, 10000, 5),
+        Params::new(0.4_f64, 10000, 5),
+        Params::new(0.8_f64, 10000, 5),
+    ];
+    for param in &epsilon_params {
+        do_simulation_with_params(param);
+    }
+}
+
+fn do_simulation_with_params(params: &Params) {
     let priv_key1 = PrivateKey::from_base64(
         "BIl6j+J6dYttxALdjISDv6ZI4/VWVEhUzaS05LgrsfswmbLOgN\
          t9HUC2E0w+9RqZx3XMkdEHBHfNuCSMpOwofVSq3TfyKwn0NrftKisKKVSaTOt5seJ67P5QL4hxgPWvxw==",
@@ -205,38 +241,47 @@ fn main() {
          LMQIQoRwDVaW64g/WTdcxT4rDULoycUNFB60LER6hPEHg/ObBnRPV1rwS3nj9Bj0tbjVPPyL9p8QW8B+w==",
     )
     .unwrap();
-    let mut prio_results = Vec::with_capacity(n_trials);
-    let mut dprio_results = Vec::with_capacity(n_trials);
-    for _ in 0..n_trials {
-        prio_results.push(do_simulation(
+    let mut prio_results = Vec::with_capacity(params.trials);
+    let mut dprio_results = Vec::with_capacity(params.trials);
+    println!("epsilon,clients,trials,");
+    println!("{}", params);
+    println!("flavor,dimension,calculated_sum,actual_sum,client_elapsed,server_elapsed,");
+    for _ in 0..params.trials {
+        let prio_result = do_simulation(
             false,
-            epsilon,
-            n_clients,
+            params.epsilon,
+            params.clients,
             priv_key1.clone(),
             priv_key2.clone(),
-        ));
-        dprio_results.push(do_simulation(
+        );
+        println!("{}", prio_result);
+        prio_results.push(prio_result);
+        let dprio_result = do_simulation(
             true,
-            epsilon,
-            n_clients,
+            params.epsilon,
+            params.clients,
             priv_key1.clone(),
             priv_key2.clone(),
-        ));
+        );
+        println!("{}", dprio_result);
+        dprio_results.push(dprio_result);
     }
     let (prio_client_elapsed, prio_server_elapsed) = average_elapsed(&prio_results);
-    println!("prio: {} {}", prio_client_elapsed, prio_server_elapsed);
+    println!("prio_average_client_elapsed,prio_average_server_elapsed,");
+    println!("{},{},", prio_client_elapsed, prio_server_elapsed);
     let (dprio_client_elapsed, dprio_server_elapsed) = average_elapsed(&dprio_results);
-    println!("dprio: {} {}", dprio_client_elapsed, dprio_server_elapsed);
+    println!("dprio_average_client_elapsed,dprio_average_server_elapsed,");
+    println!("{},{},", dprio_client_elapsed, dprio_server_elapsed);
     let client_overhead =
         100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
     let server_overhead =
         100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
-    println!(
-        "client overhead: {:.2}% server overhead: {:.2}%",
-        client_overhead, server_overhead
-    );
+    println!("client_overhead,server_overhead,");
+    println!("{:.2}%,{:.2}%,", client_overhead, server_overhead);
 }
 
+// This code was adapted from
+// https://github.com/abetterinternet/libprio-rs/blob/e58a06de3af0bdcb12e4273751c33b5ceee94d95/examples/sum.rs
 fn do_simulation(
     do_dprio: bool,
     epsilon: f64,
@@ -340,6 +385,7 @@ fn do_simulation(
     let server_elapsed = server_start_time.elapsed();
 
     Results {
+        dprio: do_dprio,
         dimension,
         calculated_sum: <u32 as From<Field32>>::from(total_sum) as usize,
         actual_sum: actual_value,
