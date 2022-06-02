@@ -220,12 +220,23 @@ fn main() {
         .get_matches();
 
     let epsilon_params = [
-        Params::new(0.1_f64, 10000, 5),
-        Params::new(0.2_f64, 10000, 5),
-        Params::new(0.4_f64, 10000, 5),
-        Params::new(0.8_f64, 10000, 5),
+        Params::new(0.025_f64, 10_000, 5),
+        Params::new(0.05_f64, 10_000, 5),
+        Params::new(0.1_f64, 10_000, 5),
+        Params::new(0.2_f64, 10_000, 5),
+        Params::new(0.4_f64, 10_000, 5),
+        Params::new(0.8_f64, 10_000, 5),
     ];
     for param in &epsilon_params {
+        do_simulation_with_params(param);
+    }
+    let clients_params = [
+        Params::new(0.1_f64, 1000, 5),
+        Params::new(0.1_f64, 10_000, 5),
+        Params::new(0.1_f64, 100_000, 5),
+        Params::new(0.1_f64, 1_000_000, 5),
+    ];
+    for param in &clients_params {
         do_simulation_with_params(param);
     }
 }
