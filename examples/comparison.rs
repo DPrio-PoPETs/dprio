@@ -231,16 +231,13 @@ fn main() {
     ];
     do_batch_of_simulations(epsilon_params);
 
-    let mut clients_params = vec![
+    let clients_params = vec![
         Params::new(0.1_f64, 1000, 10),
         Params::new(0.1_f64, 10_000, 10),
         Params::new(0.1_f64, 100_000, 10),
         Params::new(0.1_f64, 1_000_000, 10),
     ];
-    let mut clients_results = Vec::with_capacity(clients_params.len());
-    for param in clients_params {
-        clients_results.push(do_simulation_with_params(param));
-    }
+    do_batch_of_simulations(clients_params);
 }
 
 fn do_batch_of_simulations(params_batch: Vec<Params>) {
@@ -248,18 +245,15 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
     for params in params_batch {
         results_batch.push(do_simulation_with_params(params));
     }
+    println!("server analysis:");
     for results in &results_batch {
         let (_prio_client_elapsed, prio_server_elapsed, _prio_error) =
             average_results(&results.prio_results);
         let (_dprio_client_elapsed, dprio_server_elapsed, dprio_error) =
             average_results(&results.dprio_results);
-        /*
-        let client_overhead =
-            100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
-        */
         let server_overhead =
             100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
-        // "epsilon & clients & prio srv. time & dprio srv. time & overhead & error \\ \hline"
+        // "epsilon & clients & prio time & dprio time & overhead & error \\ \hline"
         println!(
             "{} & {} & {:.1} & {:.1} & {:.2}\\% & {:.1} \\\\ \\hline",
             results.params.epsilon,
@@ -268,6 +262,24 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             dprio_server_elapsed,
             server_overhead,
             dprio_error
+        );
+    }
+    println!("client analysis:");
+    for results in &results_batch {
+        let (prio_client_elapsed, _prio_server_elapsed, _prio_error) =
+            average_results(&results.prio_results);
+        let (dprio_client_elapsed, _dprio_server_elapsed, _dprio_error) =
+            average_results(&results.dprio_results);
+        let client_overhead =
+            100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
+        // "epsilon & clients & prio time & dprio time & overhead \\ \hline"
+        println!(
+            "{} & {} & {:.1} & {:.1} & {:.2}\\% \\\\ \\hline",
+            results.params.epsilon,
+            results.params.clients,
+            prio_client_elapsed,
+            dprio_client_elapsed,
+            client_overhead
         );
     }
     for results in &results_batch {
