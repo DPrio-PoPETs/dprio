@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate clap;
 extern crate prio;
 
@@ -177,16 +176,19 @@ impl fmt::Display for Results {
     }
 }
 
-fn average_elapsed(results: &[Results]) -> (f64, f64) {
+fn average_results(results: &[Results]) -> (f64, f64, f64) {
     let mut client_elapsed_sum = 0;
     let mut server_elapsed_sum = 0;
+    let mut error_sum = 0;
     for result in results.iter() {
         client_elapsed_sum += result.client_elapsed;
         server_elapsed_sum += result.server_elapsed;
+        error_sum += result.actual_sum.abs_diff(result.calculated_sum);
     }
     (
         client_elapsed_sum as f64 / results.len() as f64,
         server_elapsed_sum as f64 / results.len() as f64,
+        error_sum as f64 / results.len() as f64,
     )
 }
 
@@ -219,29 +221,92 @@ fn main() {
         .about("Compare simulated prio and dprio")
         .get_matches();
 
-    let epsilon_params = [
-        Params::new(0.025_f64, 10_000, 5),
-        Params::new(0.05_f64, 10_000, 5),
-        Params::new(0.1_f64, 10_000, 5),
-        Params::new(0.2_f64, 10_000, 5),
-        Params::new(0.4_f64, 10_000, 5),
-        Params::new(0.8_f64, 10_000, 5),
+    let epsilon_params = vec![
+        Params::new(0.025_f64, 10_000, 10),
+        Params::new(0.05_f64, 10_000, 10),
+        Params::new(0.1_f64, 10_000, 10),
+        Params::new(0.2_f64, 10_000, 10),
+        Params::new(0.4_f64, 10_000, 10),
+        Params::new(0.8_f64, 10_000, 10),
     ];
-    for param in &epsilon_params {
-        do_simulation_with_params(param);
-    }
-    let clients_params = [
-        Params::new(0.1_f64, 1000, 5),
-        Params::new(0.1_f64, 10_000, 5),
-        Params::new(0.1_f64, 100_000, 5),
-        Params::new(0.1_f64, 1_000_000, 5),
+    do_batch_of_simulations(epsilon_params);
+
+    let mut clients_params = vec![
+        Params::new(0.1_f64, 1000, 10),
+        Params::new(0.1_f64, 10_000, 10),
+        Params::new(0.1_f64, 100_000, 10),
+        Params::new(0.1_f64, 1_000_000, 10),
     ];
-    for param in &clients_params {
-        do_simulation_with_params(param);
+    let mut clients_results = Vec::with_capacity(clients_params.len());
+    for param in clients_params {
+        clients_results.push(do_simulation_with_params(param));
     }
 }
 
-fn do_simulation_with_params(params: &Params) {
+fn do_batch_of_simulations(params_batch: Vec<Params>) {
+    let mut results_batch = Vec::with_capacity(params_batch.len());
+    for params in params_batch {
+        results_batch.push(do_simulation_with_params(params));
+    }
+    for results in &results_batch {
+        let (_prio_client_elapsed, prio_server_elapsed, _prio_error) =
+            average_results(&results.prio_results);
+        let (_dprio_client_elapsed, dprio_server_elapsed, dprio_error) =
+            average_results(&results.dprio_results);
+        /*
+        let client_overhead =
+            100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
+        */
+        let server_overhead =
+            100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
+        // "epsilon & clients & prio srv. time & dprio srv. time & overhead & error \\ \hline"
+        println!(
+            "{} & {} & {:.1} & {:.1} & {:.2}\\% & {:.1} \\\\ \\hline",
+            results.params.epsilon,
+            results.params.clients,
+            prio_server_elapsed,
+            dprio_server_elapsed,
+            server_overhead,
+            dprio_error
+        );
+    }
+    for results in &results_batch {
+        println!("epsilon,clients,trials,");
+        println!(
+            "{},{},{},",
+            results.params.epsilon, results.params.clients, results.params.trials
+        );
+        println!("flavor,dimension,calculated_sum,actual_sum,client_elapsed,server_elapsed,");
+        for prio_result in &results.prio_results {
+            println!(
+                "prio,{},{},{},{},{},",
+                prio_result.dimension,
+                prio_result.calculated_sum,
+                prio_result.actual_sum,
+                prio_result.client_elapsed,
+                prio_result.server_elapsed
+            );
+        }
+        for dprio_result in &results.dprio_results {
+            println!(
+                "dprio,{},{},{},{},{},",
+                dprio_result.dimension,
+                dprio_result.calculated_sum,
+                dprio_result.actual_sum,
+                dprio_result.client_elapsed,
+                dprio_result.server_elapsed
+            );
+        }
+    }
+}
+
+struct BatchResults {
+    params: Params,
+    prio_results: Vec<Results>,
+    dprio_results: Vec<Results>,
+}
+
+fn do_simulation_with_params(params: Params) -> BatchResults {
     let priv_key1 = PrivateKey::from_base64(
         "BIl6j+J6dYttxALdjISDv6ZI4/VWVEhUzaS05LgrsfswmbLOgN\
          t9HUC2E0w+9RqZx3XMkdEHBHfNuCSMpOwofVSq3TfyKwn0NrftKisKKVSaTOt5seJ67P5QL4hxgPWvxw==",
@@ -254,9 +319,6 @@ fn do_simulation_with_params(params: &Params) {
     .unwrap();
     let mut prio_results = Vec::with_capacity(params.trials);
     let mut dprio_results = Vec::with_capacity(params.trials);
-    println!("epsilon,clients,trials,");
-    println!("{}", params);
-    println!("flavor,dimension,calculated_sum,actual_sum,client_elapsed,server_elapsed,");
     for _ in 0..params.trials {
         let prio_result = do_simulation(
             false,
@@ -265,7 +327,6 @@ fn do_simulation_with_params(params: &Params) {
             priv_key1.clone(),
             priv_key2.clone(),
         );
-        println!("{}", prio_result);
         prio_results.push(prio_result);
         let dprio_result = do_simulation(
             true,
@@ -274,21 +335,13 @@ fn do_simulation_with_params(params: &Params) {
             priv_key1.clone(),
             priv_key2.clone(),
         );
-        println!("{}", dprio_result);
         dprio_results.push(dprio_result);
     }
-    let (prio_client_elapsed, prio_server_elapsed) = average_elapsed(&prio_results);
-    println!("prio_average_client_elapsed,prio_average_server_elapsed,");
-    println!("{},{},", prio_client_elapsed, prio_server_elapsed);
-    let (dprio_client_elapsed, dprio_server_elapsed) = average_elapsed(&dprio_results);
-    println!("dprio_average_client_elapsed,dprio_average_server_elapsed,");
-    println!("{},{},", dprio_client_elapsed, dprio_server_elapsed);
-    let client_overhead =
-        100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
-    let server_overhead =
-        100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
-    println!("client_overhead,server_overhead,");
-    println!("{:.2}%,{:.2}%,", client_overhead, server_overhead);
+    BatchResults {
+        params,
+        prio_results,
+        dprio_results,
+    }
 }
 
 // This code was adapted from
