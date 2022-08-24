@@ -356,6 +356,37 @@ fn do_simulation_with_params(params: Params) -> BatchResults {
     }
 }
 
+fn select_noise(
+    shares_for_server1: &mut Vec<Vec<u8>>,
+    shares_for_server2: &mut Vec<Vec<u8>>,
+    noise_for_server1: &mut Vec<Vec<u8>>,
+    noise_for_server2: &mut Vec<Vec<u8>>,
+) -> usize {
+    let n_noise = (shares_for_server1.len() as f64).ln().ceil() as usize;
+    for _ in 0..n_noise {
+        let commitment_from_server1 = Commitment::new(noise_for_server1.len() as u64);
+        let commitment_from_server2 = Commitment::new(noise_for_server2.len() as u64);
+        let closed_commitment_from_server1 = commitment_from_server1.commit();
+        let closed_commitment_from_server2 = commitment_from_server2.commit();
+        let published_commitment_from_server1 = commitment_from_server1.publish();
+        let published_commitment_from_server2 = commitment_from_server2.publish();
+        let opened_commitment_from_server1 = closed_commitment_from_server1
+            .validate(published_commitment_from_server1)
+            .unwrap();
+        let opened_commitment_from_server2 = closed_commitment_from_server2
+            .validate(published_commitment_from_server2)
+            .unwrap();
+        let noise_index = OpenedCommitment::gather(&[
+            opened_commitment_from_server1,
+            opened_commitment_from_server2,
+        ])
+        .unwrap();
+        shares_for_server1.push(noise_for_server1.remove(noise_index as usize));
+        shares_for_server2.push(noise_for_server2.remove(noise_index as usize));
+    }
+    n_noise
+}
+
 // This code was adapted from
 // https://github.com/abetterinternet/libprio-rs/blob/e58a06de3af0bdcb12e4273751c33b5ceee94d95/examples/sum.rs
 fn do_simulation(
@@ -416,27 +447,16 @@ fn do_simulation(
     let client_elapsed = client_start_time.elapsed();
 
     let server_start_time = Instant::now();
-    if do_dprio {
-        let commitment_from_server1 = Commitment::new(n_clients as u64);
-        let commitment_from_server2 = Commitment::new(n_clients as u64);
-        let closed_commitment_from_server1 = commitment_from_server1.commit();
-        let closed_commitment_from_server2 = commitment_from_server2.commit();
-        let published_commitment_from_server1 = commitment_from_server1.publish();
-        let published_commitment_from_server2 = commitment_from_server2.publish();
-        let opened_commitment_from_server1 = closed_commitment_from_server1
-            .validate(published_commitment_from_server1)
-            .unwrap();
-        let opened_commitment_from_server2 = closed_commitment_from_server2
-            .validate(published_commitment_from_server2)
-            .unwrap();
-        let noise_index = OpenedCommitment::gather(&[
-            opened_commitment_from_server1,
-            opened_commitment_from_server2,
-        ])
-        .unwrap();
-        shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
-        shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
-    }
+    let n_noise = if do_dprio {
+        select_noise(
+            &mut shares_for_server1,
+            &mut shares_for_server2,
+            &mut noise_for_server1,
+            &mut noise_for_server2,
+        )
+    } else {
+        0
+    };
 
     let eval_at = Field32::from(12313);
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
@@ -454,7 +474,11 @@ fn do_simulation(
     );
 
     let raw_sum = *server1.add_and_get_total_sum(server2.total_sum());
-    let total_shift_count = if do_dprio { n_clients + 1 } else { n_clients };
+    let total_shift_count = if do_dprio {
+        n_clients + n_noise
+    } else {
+        n_clients
+    };
     let total_shift_value = Field32::from((shift_value as usize * total_shift_count) as u32);
     // assert!(total_shift_value <= raw_sum); TODO: why doesn't this work
     let total_sum = raw_sum - total_shift_value;
