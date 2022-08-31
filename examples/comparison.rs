@@ -195,14 +195,16 @@ fn average_results(results: &[Results]) -> (f64, f64, f64) {
 struct Params {
     epsilon: f64,
     clients: usize,
+    noises: usize,
     trials: usize,
 }
 
 impl Params {
-    fn new(epsilon: f64, clients: usize, trials: usize) -> Params {
+    fn new(epsilon: f64, clients: usize, noises: usize, trials: usize) -> Params {
         Params {
             epsilon,
             clients,
+            noises,
             trials,
         }
     }
@@ -221,6 +223,7 @@ fn main() {
         .about("Compare simulated prio and dprio")
         .get_matches();
 
+    /*
     let epsilon_params = vec![
         Params::new(0.025_f64, 10_000, 10),
         Params::new(0.05_f64, 10_000, 10),
@@ -238,6 +241,15 @@ fn main() {
         Params::new(0.1_f64, 1_000_000, 10),
     ];
     do_batch_of_simulations(clients_params);
+    */
+    let noises_params = vec![
+        Params::new(0.1_f64, 100_000, 1, 10),
+        Params::new(0.1_f64, 100_000, 2, 10),
+        Params::new(0.1_f64, 100_000, 4, 10),
+        Params::new(0.1_f64, 100_000, 8, 10),
+        Params::new(0.1_f64, 100_000, 16, 10),
+    ];
+    do_batch_of_simulations(noises_params);
 }
 
 fn do_batch_of_simulations(params_batch: Vec<Params>) {
@@ -253,11 +265,12 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             average_results(&results.dprio_results);
         let server_overhead =
             100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
-        // "epsilon & clients & prio time & dprio time & overhead & error \\ \hline"
+        // "epsilon & clients & noises & prio time & dprio time & overhead & error \\ \hline"
         println!(
-            "{} & {} & {:.1} & {:.1} & {:.2}\\% & {:.1} \\\\ \\hline",
+            "{} & {} & {} & {:.1} & {:.1} & {:.2}\\% & {:.1} \\\\ \\hline",
             results.params.epsilon,
             results.params.clients,
+            results.params.noises,
             prio_server_elapsed,
             dprio_server_elapsed,
             server_overhead,
@@ -336,6 +349,7 @@ fn do_simulation_with_params(params: Params) -> BatchResults {
             false,
             params.epsilon,
             params.clients,
+            params.noises,
             priv_key1.clone(),
             priv_key2.clone(),
         );
@@ -344,6 +358,7 @@ fn do_simulation_with_params(params: Params) -> BatchResults {
             true,
             params.epsilon,
             params.clients,
+            params.noises,
             priv_key1.clone(),
             priv_key2.clone(),
         );
@@ -361,9 +376,9 @@ fn select_noise(
     shares_for_server2: &mut Vec<Vec<u8>>,
     noise_for_server1: &mut Vec<Vec<u8>>,
     noise_for_server2: &mut Vec<Vec<u8>>,
-) -> usize {
-    let n_noise = (shares_for_server1.len() as f64).ln().ceil() as usize;
-    for _ in 0..n_noise {
+    n_noises: usize,
+) {
+    for _ in 0..n_noises {
         let commitment_from_server1 = Commitment::new(noise_for_server1.len() as u64);
         let commitment_from_server2 = Commitment::new(noise_for_server2.len() as u64);
         let closed_commitment_from_server1 = commitment_from_server1.commit();
@@ -381,10 +396,9 @@ fn select_noise(
             opened_commitment_from_server2,
         ])
         .unwrap();
-        shares_for_server1.push(noise_for_server1.remove(noise_index as usize));
-        shares_for_server2.push(noise_for_server2.remove(noise_index as usize));
+        shares_for_server1.push(noise_for_server1.swap_remove(noise_index as usize));
+        shares_for_server2.push(noise_for_server2.swap_remove(noise_index as usize));
     }
-    n_noise
 }
 
 // This code was adapted from
@@ -393,6 +407,7 @@ fn do_simulation(
     do_dprio: bool,
     epsilon: f64,
     n_clients: usize,
+    n_noises: usize,
     priv_key1: PrivateKey,
     priv_key2: PrivateKey,
 ) -> Results {
@@ -447,16 +462,15 @@ fn do_simulation(
     let client_elapsed = client_start_time.elapsed();
 
     let server_start_time = Instant::now();
-    let n_noise = if do_dprio {
+    if do_dprio {
         select_noise(
             &mut shares_for_server1,
             &mut shares_for_server2,
             &mut noise_for_server1,
             &mut noise_for_server2,
-        )
-    } else {
-        0
-    };
+            n_noises,
+        );
+    }
 
     let eval_at = Field32::from(12313);
     let server1_verifications = server1.generate_verifications(&shares_for_server1, eval_at);
@@ -475,7 +489,7 @@ fn do_simulation(
 
     let raw_sum = *server1.add_and_get_total_sum(server2.total_sum());
     let total_shift_count = if do_dprio {
-        n_clients + n_noise
+        n_clients + n_noises
     } else {
         n_clients
     };
