@@ -223,31 +223,29 @@ fn main() {
         .about("Compare simulated prio and dprio")
         .get_matches();
 
-    /*
     let epsilon_params = vec![
-        Params::new(0.025_f64, 10_000, 10),
-        Params::new(0.05_f64, 10_000, 10),
-        Params::new(0.1_f64, 10_000, 10),
-        Params::new(0.2_f64, 10_000, 10),
-        Params::new(0.4_f64, 10_000, 10),
-        Params::new(0.8_f64, 10_000, 10),
+        Params::new(0.025_f64, 10_000, 14, 10),
+        Params::new(0.05_f64, 10_000, 14, 10),
+        Params::new(0.1_f64, 10_000, 14, 10),
+        Params::new(0.2_f64, 10_000, 14, 10),
+        Params::new(0.4_f64, 10_000, 14, 10),
+        Params::new(0.8_f64, 10_000, 14, 10),
     ];
     do_batch_of_simulations(epsilon_params);
 
     let clients_params = vec![
-        Params::new(0.1_f64, 1000, 10),
-        Params::new(0.1_f64, 10_000, 10),
-        Params::new(0.1_f64, 100_000, 10),
-        Params::new(0.1_f64, 1_000_000, 10),
+        Params::new(0.1_f64, 1000, 10, 10),
+        Params::new(0.1_f64, 10_000, 14, 10),
+        Params::new(0.1_f64, 100_000, 17, 10),
+        Params::new(0.1_f64, 1_000_000, 20, 10),
     ];
     do_batch_of_simulations(clients_params);
-    */
     let noises_params = vec![
-        Params::new(0.1_f64, 100_000, 1, 10),
-        Params::new(0.1_f64, 100_000, 2, 10),
-        Params::new(0.1_f64, 100_000, 4, 10),
-        Params::new(0.1_f64, 100_000, 8, 10),
-        Params::new(0.1_f64, 100_000, 16, 10),
+        Params::new(0.1_f64, 10_000, 1, 10),
+        Params::new(0.1_f64, 10_000, 2, 10),
+        Params::new(0.1_f64, 10_000, 4, 10),
+        Params::new(0.1_f64, 10_000, 8, 10),
+        Params::new(0.1_f64, 10_000, 16, 10),
     ];
     do_batch_of_simulations(noises_params);
 }
@@ -296,10 +294,13 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
         );
     }
     for results in &results_batch {
-        println!("epsilon,clients,trials,");
+        println!("epsilon,clients,noises,trials,");
         println!(
-            "{},{},{},",
-            results.params.epsilon, results.params.clients, results.params.trials
+            "{},{},{},{},",
+            results.params.epsilon,
+            results.params.clients,
+            results.params.noises,
+            results.params.trials
         );
         println!("flavor,dimension,calculated_sum,actual_sum,client_elapsed,server_elapsed,");
         for prio_result in &results.prio_results {
