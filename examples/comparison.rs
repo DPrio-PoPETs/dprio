@@ -224,28 +224,28 @@ fn main() {
         .get_matches();
 
     let epsilon_params = vec![
-        Params::new(0.025_f64, 10_000, 14, 10),
-        Params::new(0.05_f64, 10_000, 14, 10),
-        Params::new(0.1_f64, 10_000, 14, 10),
-        Params::new(0.2_f64, 10_000, 14, 10),
-        Params::new(0.4_f64, 10_000, 14, 10),
-        Params::new(0.8_f64, 10_000, 14, 10),
+        Params::new(0.025_f64, 10_000, 14, 50),
+        Params::new(0.05_f64, 10_000, 14, 50),
+        Params::new(0.1_f64, 10_000, 14, 50),
+        Params::new(0.2_f64, 10_000, 14, 50),
+        Params::new(0.4_f64, 10_000, 14, 50),
+        Params::new(0.8_f64, 10_000, 14, 50),
     ];
     do_batch_of_simulations(epsilon_params);
 
     let clients_params = vec![
-        Params::new(0.1_f64, 1000, 10, 10),
-        Params::new(0.1_f64, 10_000, 14, 10),
-        Params::new(0.1_f64, 100_000, 17, 10),
-        Params::new(0.1_f64, 1_000_000, 20, 10),
+        Params::new(0.1_f64, 1000, 10, 50),
+        Params::new(0.1_f64, 10_000, 14, 50),
+        Params::new(0.1_f64, 100_000, 17, 50),
+        Params::new(0.1_f64, 1_000_000, 20, 50),
     ];
     do_batch_of_simulations(clients_params);
     let noises_params = vec![
-        Params::new(0.1_f64, 10_000, 1, 10),
-        Params::new(0.1_f64, 10_000, 2, 10),
-        Params::new(0.1_f64, 10_000, 4, 10),
-        Params::new(0.1_f64, 10_000, 8, 10),
-        Params::new(0.1_f64, 10_000, 16, 10),
+        Params::new(0.1_f64, 10_000, 1, 50),
+        Params::new(0.1_f64, 10_000, 2, 50),
+        Params::new(0.1_f64, 10_000, 4, 50),
+        Params::new(0.1_f64, 10_000, 8, 50),
+        Params::new(0.1_f64, 10_000, 16, 50),
     ];
     do_batch_of_simulations(noises_params);
 }
