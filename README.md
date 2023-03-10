@@ -1,5 +1,10 @@
 # DPrio
 
+This repository consists of an implementation of DPrio as well as a small
+program to evaluate its performance against Prio. The file
+`measurements-2022-11-01.csv` contains the output of running the evaluation
+program on 2022-11-01.
+
 ## Setup
 
 ### With Docker
