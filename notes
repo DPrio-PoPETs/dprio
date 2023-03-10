@@ -1,4 +1,0 @@
-expect error ~sqrt(2) / epsilon?
-take average absolute difference in "real" answer vs. computed answer
-doing a count, so delta = 1
-epsilon = 0.1, 0.2, 0.3, ... (?)
