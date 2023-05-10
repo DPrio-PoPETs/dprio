@@ -1,7 +1,7 @@
 extern crate clap;
 extern crate prio;
 
-use clap::Command;
+use clap::{Arg, ArgAction, Command};
 use prio::client::*;
 use prio::encrypt::*;
 use prio::field::*;
@@ -217,35 +217,46 @@ impl fmt::Display for Params {
 }
 
 fn main() {
-    let _matches = Command::new("comparison")
+    let matches = Command::new("comparison")
         .version("0.1")
         .author("Dana Keeler <dkeeler@mozilla.com>")
         .about("Compare simulated prio and dprio")
+        .arg(Arg::new("full").short('f').action(ArgAction::SetTrue))
         .get_matches();
+    let do_full_run = matches.get_flag("full");
+    if do_full_run {
+        eprintln!("doing full run");
+    } else {
+        eprintln!("not doing full run");
+    };
+    let (n_clients, n_trials) = if do_full_run { (10_000, 50) } else { (1000, 5) };
 
     let epsilon_params = vec![
-        Params::new(0.025_f64, 10_000, 14, 50),
-        Params::new(0.05_f64, 10_000, 14, 50),
-        Params::new(0.1_f64, 10_000, 14, 50),
-        Params::new(0.2_f64, 10_000, 14, 50),
-        Params::new(0.4_f64, 10_000, 14, 50),
-        Params::new(0.8_f64, 10_000, 14, 50),
+        Params::new(0.025_f64, n_clients, 14, n_trials),
+        Params::new(0.05_f64, n_clients, 14, n_trials),
+        Params::new(0.1_f64, n_clients, 14, n_trials),
+        Params::new(0.2_f64, n_clients, 14, n_trials),
+        Params::new(0.4_f64, n_clients, 14, n_trials),
+        Params::new(0.8_f64, n_clients, 14, n_trials),
     ];
     do_batch_of_simulations(epsilon_params);
 
-    let clients_params = vec![
-        Params::new(0.1_f64, 1000, 10, 50),
-        Params::new(0.1_f64, 10_000, 14, 50),
-        Params::new(0.1_f64, 100_000, 17, 50),
-        Params::new(0.1_f64, 1_000_000, 20, 50),
-    ];
-    do_batch_of_simulations(clients_params);
+    if do_full_run {
+        let clients_params = vec![
+            Params::new(0.1_f64, 1000, 10, n_trials),
+            Params::new(0.1_f64, 10_000, 14, n_trials),
+            Params::new(0.1_f64, 100_000, 17, n_trials),
+            Params::new(0.1_f64, 1_000_000, 20, n_trials),
+        ];
+        do_batch_of_simulations(clients_params);
+    }
+
     let noises_params = vec![
-        Params::new(0.1_f64, 10_000, 1, 50),
-        Params::new(0.1_f64, 10_000, 2, 50),
-        Params::new(0.1_f64, 10_000, 4, 50),
-        Params::new(0.1_f64, 10_000, 8, 50),
-        Params::new(0.1_f64, 10_000, 16, 50),
+        Params::new(0.1_f64, n_clients, 1, n_trials),
+        Params::new(0.1_f64, n_clients, 2, n_trials),
+        Params::new(0.1_f64, n_clients, 4, n_trials),
+        Params::new(0.1_f64, n_clients, 8, n_trials),
+        Params::new(0.1_f64, n_clients, 16, n_trials),
     ];
     do_batch_of_simulations(noises_params);
 }
