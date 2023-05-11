@@ -229,17 +229,22 @@ fn main() {
     } else {
         println!("running abbreviated simulation");
     };
-    let (n_clients, n_trials) = if do_full_run { (10_000, 50) } else { (1000, 5) };
+    println!("(in each table, remove columns that don't vary, as they are redundant)");
+    let (n_clients, n_noises, n_trials) = if do_full_run {
+        (10_000, 14, 50)
+    } else {
+        (1000, 10, 5)
+    };
 
     let epsilon_params = vec![
-        Params::new(0.025_f64, n_clients, 14, n_trials),
-        Params::new(0.05_f64, n_clients, 14, n_trials),
-        Params::new(0.1_f64, n_clients, 14, n_trials),
-        Params::new(0.2_f64, n_clients, 14, n_trials),
-        Params::new(0.4_f64, n_clients, 14, n_trials),
-        Params::new(0.8_f64, n_clients, 14, n_trials),
+        Params::new(0.025_f64, n_clients, n_noises, n_trials),
+        Params::new(0.05_f64, n_clients, n_noises, n_trials),
+        Params::new(0.1_f64, n_clients, n_noises, n_trials),
+        Params::new(0.2_f64, n_clients, n_noises, n_trials),
+        Params::new(0.4_f64, n_clients, n_noises, n_trials),
+        Params::new(0.8_f64, n_clients, n_noises, n_trials),
     ];
-    println!("Table 3: Average simulation of server processing time with varying $\\epsilon$ (remove the columns that don't vary, as they are redundant)");
+    println!("Table 3: Average simulation of server processing time with varying epsilon");
     do_batch_of_simulations(epsilon_params);
 
     let clients_params = if do_full_run {
@@ -279,7 +284,8 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
     for params in params_batch {
         results_batch.push(do_simulation_with_params(params));
     }
-    println!("(fields are epsilon, clients, noises, prio time (ms), dprio time (ms), overhead (%), error)");
+    println!(">>>>> begin copy/paste latex <<<<<");
+    println!("$\\epsilon$ & Population Size & Client Noises Selected & Prio Server Processing Time (ms) & \\dpprio Server Processing Time (ms) & Overhead (\\%) & Error \\\\ \\hline");
     for results in &results_batch {
         let (_prio_client_elapsed, prio_server_elapsed, _prio_error) =
             average_results(&results.prio_results);
@@ -287,7 +293,6 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             average_results(&results.dprio_results);
         let server_overhead =
             100.0_f64 * (dprio_server_elapsed - prio_server_elapsed) / prio_server_elapsed;
-        // "epsilon & clients & noises & prio time & dprio time & overhead & error \\ \hline"
         println!(
             "{} & {} & {} & {:.1} & {:.1} & {:.2}\\% & {:.1} \\\\ \\hline",
             results.params.epsilon,
@@ -299,6 +304,7 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             dprio_error
         );
     }
+    println!(">>>>> end copy/paste latex <<<<<");
     let mut client_overheads = Vec::with_capacity(results_batch.len());
     for results in &results_batch {
         let (prio_client_elapsed, _prio_server_elapsed, _prio_error) =
@@ -310,6 +316,7 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
         client_overheads.push(format!("{:.2}", client_overhead));
     }
     println!("(client overheads (%): {})", client_overheads.join(" "));
+    println!("");
 }
 
 struct BatchResults {
