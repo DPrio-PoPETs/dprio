@@ -32,8 +32,9 @@ To run the full simulation, run `cargo run --release --example comparison -- -f`
 
 `comparison` outputs the parameters of each batch of trials with the average
 server running time for each of Prio and DPrio, the server overhead, and the
-error introduced by DPrio. It then outputs the average client running time for
-Prio and DPrio, and the client overhead.
+error introduced by DPrio. This output is formatted in LaTeX for ease of
+copying/pasting into a paper. `comparison` also outputs the average client
+overhead so that information can be included in the paper as well.
 
 `comparison` runs three batches of trials: one varying epsilon, one varying the
 number of clients, and one varying the number of noises.
