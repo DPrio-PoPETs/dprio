@@ -225,9 +225,9 @@ fn main() {
         .get_matches();
     let do_full_run = matches.get_flag("full");
     if do_full_run {
-        eprintln!("doing full run");
+        println!("running full simulation");
     } else {
-        eprintln!("not doing full run");
+        println!("running abbreviated simulation");
     };
     let (n_clients, n_trials) = if do_full_run { (10_000, 50) } else { (1000, 5) };
 
@@ -239,17 +239,27 @@ fn main() {
         Params::new(0.4_f64, n_clients, 14, n_trials),
         Params::new(0.8_f64, n_clients, 14, n_trials),
     ];
+    println!("Table 3: Average simulation of server processing time with varying $\\epsilon$ (remove the columns that don't vary, as they are redundant)");
     do_batch_of_simulations(epsilon_params);
 
-    if do_full_run {
-        let clients_params = vec![
+    let clients_params = if do_full_run {
+        vec![
             Params::new(0.1_f64, 1000, 10, n_trials),
             Params::new(0.1_f64, 10_000, 14, n_trials),
             Params::new(0.1_f64, 100_000, 17, n_trials),
             Params::new(0.1_f64, 1_000_000, 20, n_trials),
-        ];
-        do_batch_of_simulations(clients_params);
-    }
+        ]
+    } else {
+        vec![
+            Params::new(0.1_f64, 100, 7, n_trials),
+            Params::new(0.1_f64, 1000, 10, n_trials),
+            Params::new(0.1_f64, 10_000, 14, n_trials),
+        ]
+    };
+    println!(
+        "Table 4: Average simulation of server processing time with varying client population size"
+    );
+    do_batch_of_simulations(clients_params);
 
     let noises_params = vec![
         Params::new(0.1_f64, n_clients, 1, n_trials),
@@ -258,6 +268,9 @@ fn main() {
         Params::new(0.1_f64, n_clients, 8, n_trials),
         Params::new(0.1_f64, n_clients, 16, n_trials),
     ];
+    println!(
+        "Table 5: Average simulation of server processing time with varying client noises elected"
+    );
     do_batch_of_simulations(noises_params);
 }
 
@@ -266,7 +279,7 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
     for params in params_batch {
         results_batch.push(do_simulation_with_params(params));
     }
-    println!("server analysis:");
+    println!("(fields are epsilon, clients, noises, prio time (ms), dprio time (ms), overhead (%), error)");
     for results in &results_batch {
         let (_prio_client_elapsed, prio_server_elapsed, _prio_error) =
             average_results(&results.prio_results);
@@ -286,7 +299,7 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             dprio_error
         );
     }
-    println!("client analysis:");
+    let mut client_overheads = Vec::with_capacity(results_batch.len());
     for results in &results_batch {
         let (prio_client_elapsed, _prio_server_elapsed, _prio_error) =
             average_results(&results.prio_results);
@@ -294,47 +307,9 @@ fn do_batch_of_simulations(params_batch: Vec<Params>) {
             average_results(&results.dprio_results);
         let client_overhead =
             100.0_f64 * (dprio_client_elapsed - prio_client_elapsed) / prio_client_elapsed;
-        // "epsilon & clients & prio time & dprio time & overhead \\ \hline"
-        println!(
-            "{} & {} & {:.1} & {:.1} & {:.2}\\% \\\\ \\hline",
-            results.params.epsilon,
-            results.params.clients,
-            prio_client_elapsed,
-            dprio_client_elapsed,
-            client_overhead
-        );
+        client_overheads.push(format!("{:.2}", client_overhead));
     }
-    for results in &results_batch {
-        println!("epsilon,clients,noises,trials,");
-        println!(
-            "{},{},{},{},",
-            results.params.epsilon,
-            results.params.clients,
-            results.params.noises,
-            results.params.trials
-        );
-        println!("flavor,dimension,calculated_sum,actual_sum,client_elapsed,server_elapsed,");
-        for prio_result in &results.prio_results {
-            println!(
-                "prio,{},{},{},{},{},",
-                prio_result.dimension,
-                prio_result.calculated_sum,
-                prio_result.actual_sum,
-                prio_result.client_elapsed,
-                prio_result.server_elapsed
-            );
-        }
-        for dprio_result in &results.dprio_results {
-            println!(
-                "dprio,{},{},{},{},{},",
-                dprio_result.dimension,
-                dprio_result.calculated_sum,
-                dprio_result.actual_sum,
-                dprio_result.client_elapsed,
-                dprio_result.server_elapsed
-            );
-        }
-    }
+    println!("(client overheads (%): {})", client_overheads.join(" "));
 }
 
 struct BatchResults {
