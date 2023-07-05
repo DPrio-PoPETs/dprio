@@ -12,7 +12,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 clap = "4"
-prio = { git = "Https://github.com/mozkeeler/libprio-rs", branch = "sum" }
+prio = { git = "Https://github.com/DPrio-PoPETs/libprio-rs", branch = "sum" }
 
 [[example]]
 name = "comparison"
